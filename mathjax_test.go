@@ -47,6 +47,84 @@ func TestMathJax(t *testing.T) {
 			in:  "*foo\n  ",
 			out: "<p>*foo</p>",
 		},
+		// Same-line format tests
+		{
+			d:   "math display - same line simple",
+			in:  `$$x+y$$`,
+			out: `<p><span class="math display">\[x+y\]</span></p>`,
+		},
+		{
+			d:   "math display - same line complex",
+			in:  `$$\iint^{\infty}_{0}{xdxdy}$$`,
+			out: `<p><span class="math display">\[\iint^{\infty}_{0}{xdxdy}\]</span></p>`,
+		},
+		{
+			d:   "math display - same line with spaces",
+			in:  `$$  a + b  $$`,
+			out: `<p><span class="math display">\[  a + b  \]</span></p>`,
+		},
+		{
+			d:   "math display - same line empty",
+			in:  `$$$$`,
+			out: `<p><span class="math display">\[\]</span></p>`,
+		},
+		// Consecutive blocks tests
+		{
+			d:  "math display - two same-line blocks",
+			in: "$$x+y$$\n$$a+b$$",
+			out: `<p><span class="math display">\[x+y\]</span></p>
+<p><span class="math display">\[a+b\]</span></p>`,
+		},
+		{
+			d:  "math display - two same-line blocks with blank line",
+			in: "$$x+y$$\n\n$$a+b$$",
+			out: `<p><span class="math display">\[x+y\]</span></p>
+<p><span class="math display">\[a+b\]</span></p>`,
+		},
+		{
+			d:  "math display - consecutive multi-line blocks with blank line",
+			in: "$$\n1+2\n$$\n\n$$\n3+4\n$$",
+			out: `<p><span class="math display">\[1+2
+\]</span></p>
+<p><span class="math display">\[3+4
+\]</span></p>`,
+		},
+		// Mixed format tests
+		{
+			d:  "math display - multi-line then same-line",
+			in: "$$\nx+y\n$$\n$$a+b$$",
+			out: `<p><span class="math display">\[x+y
+\]</span></p>
+<p><span class="math display">\[a+b\]</span></p>`,
+		},
+		// Multi-line with content variations
+		{
+			d:  "math display - multi-line multiple lines content",
+			in: "$$\na+b\\\\\nc+d\n$$",
+			out: `<p><span class="math display">\[a+b\\
+c+d
+\]</span></p>`,
+		},
+		// Text mixing tests
+		{
+			d:  "math display - text before same-line",
+			in: "text before\n$$x+y$$",
+			out: `<p>text before</p>
+<p><span class="math display">\[x+y\]</span></p>`,
+		},
+		{
+			d:  "math display - text after same-line",
+			in: "$$x+y$$\ntext after",
+			out: `<p><span class="math display">\[x+y\]</span></p>
+<p>text after</p>`,
+		},
+		{
+			d:  "math display - text before and after same-line",
+			in: "before\n$$x+y$$\nafter",
+			out: `<p>before</p>
+<p><span class="math display">\[x+y\]</span></p>
+<p>after</p>`,
+		},
 	}
 
 	for i, tc := range tests {

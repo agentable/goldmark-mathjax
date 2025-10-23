@@ -23,20 +23,59 @@ func NewMathJaxBlockParser() parser.BlockParser {
 }
 
 func (b *mathJaxBlockParser) Open(parent ast.Node, reader text.Reader, pc parser.Context) (ast.Node, parser.State) {
-	line, _ := reader.PeekLine()
+	line, segment := reader.PeekLine()
 	pos := pc.BlockOffset()
 	if pos == -1 {
 		return nil, parser.NoChildren
 	}
-	if line[pos] != '$' {
+	if pos >= len(line) || line[pos] != '$' {
 		return nil, parser.NoChildren
 	}
+
+	// Count opening $$
 	i := pos
 	for ; i < len(line) && line[i] == '$'; i++ {
 	}
 	if i-pos < 2 {
 		return nil, parser.NoChildren
 	}
+
+	remainingLine := line[i:]
+
+	// Check if closing $$ exists on the same line
+	// Look for at least 2 consecutive $ followed by blank/newline
+	closingPos := -1
+	for j := 0; j < len(remainingLine)-1; j++ {
+		if remainingLine[j] == '$' {
+			k := j
+			for k < len(remainingLine) && remainingLine[k] == '$' {
+				k++
+			}
+			closingLen := k - j
+			if closingLen >= 2 && util.IsBlank(remainingLine[k:]) {
+				// Found valid closing delimiter
+				closingPos = j
+				break
+			}
+			j = k - 1 // Skip the $ sequence we just checked
+		}
+	}
+
+	if closingPos > 0 {
+		// Same-line format: $$content$$
+		node := NewMathBlock()
+		content := remainingLine[:closingPos]
+		if len(content) > 0 {
+			// Add content to node (excluding opening and closing $$)
+			contentSegment := text.NewSegment(segment.Start+i, segment.Start+i+closingPos)
+			node.Lines().Append(contentSegment)
+		}
+		// Don't advance reader - goldmark will do it automatically
+		// Return Close to indicate this block is complete
+		return node, parser.Close
+	}
+
+	// Multi-line format: opening $$ on its own line
 	pc.Set(mathBlockInfoKey, &mathBlockData{indent: pos})
 	node := NewMathBlock()
 	return node, parser.NoChildren
@@ -44,7 +83,15 @@ func (b *mathJaxBlockParser) Open(parent ast.Node, reader text.Reader, pc parser
 
 func (b *mathJaxBlockParser) Continue(node ast.Node, reader text.Reader, pc parser.Context) parser.State {
 	line, segment := reader.PeekLine()
-	data := pc.Get(mathBlockInfoKey).(*mathBlockData)
+
+	// Safe get: check for nil before type assertion
+	dataInterface := pc.Get(mathBlockInfoKey)
+	if dataInterface == nil {
+		// Context has been cleared, this block should already be closed
+		return parser.Close
+	}
+	data := dataInterface.(*mathBlockData)
+
 	w, pos := util.IndentWidth(line, 0)
 	if w < 4 {
 		i := pos

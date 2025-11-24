@@ -75,9 +75,16 @@ func (b *mathJaxBlockParser) Open(parent ast.Node, reader text.Reader, pc parser
 		return node, parser.Close
 	}
 
-	// Multi-line format: opening $$ on its own line
+	// Multi-line format: opening $$ on its own line or with content on first line
 	pc.Set(mathBlockInfoKey, &mathBlockData{indent: pos})
 	node := NewMathBlock()
+
+	// If there's content after opening $$, save it as the first line
+	if len(remainingLine) > 0 && !util.IsBlank(remainingLine) {
+		contentSegment := text.NewSegment(segment.Start+i, segment.Stop)
+		node.Lines().Append(contentSegment)
+	}
+
 	return node, parser.NoChildren
 }
 
@@ -92,6 +99,7 @@ func (b *mathJaxBlockParser) Continue(node ast.Node, reader text.Reader, pc pars
 	}
 	data := dataInterface.(*mathBlockData)
 
+	// Check for closing $$ at the beginning of the line
 	w, pos := util.IndentWidth(line, 0)
 	if w < 4 {
 		i := pos
@@ -104,6 +112,39 @@ func (b *mathJaxBlockParser) Continue(node ast.Node, reader text.Reader, pc pars
 		}
 	}
 
+	// Check for closing $$ anywhere in the line (for same-line ending format)
+	// Search for $$ followed by blank/newline
+	closingPos := -1
+	for j := 0; j < len(line)-1; j++ {
+		if line[j] == '$' {
+			k := j
+			for k < len(line) && line[k] == '$' {
+				k++
+			}
+			closingLen := k - j
+			if closingLen >= 2 && util.IsBlank(line[k:]) {
+				// Found valid closing delimiter
+				closingPos = j
+				break
+			}
+			j = k - 1 // Skip the $ sequence we just checked
+		}
+	}
+
+	if closingPos >= 0 {
+		// Found closing $$ on this line - add content before $$ and close
+		pos, padding := util.DedentPosition(line, 0, data.indent)
+		if closingPos > pos {
+			// Add content before the closing $$
+			contentEnd := segment.Start + closingPos
+			seg := text.NewSegmentPadding(segment.Start+pos, contentEnd, padding)
+			node.Lines().Append(seg)
+		}
+		reader.Advance(segment.Stop - segment.Start - segment.Padding)
+		return parser.Close
+	}
+
+	// No closing delimiter found - continue adding this line to the block
 	pos, padding := util.DedentPosition(line, 0, data.indent)
 	seg := text.NewSegmentPadding(segment.Start+pos, segment.Stop, padding)
 	node.Lines().Append(seg)

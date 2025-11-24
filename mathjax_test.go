@@ -125,6 +125,44 @@ c+d
 <p><span class="math display">\[x+y\]</span></p>
 <p>after</p>`,
 		},
+		// vmatrix test - bug report case
+		{
+			d: "math display - vmatrix multiline",
+			in: `Before matrix
+
+$$\begin{vmatrix}
+\vec{i} & \vec{j} & \vec{k} \\
+1 & 2 & 3 \\
+4 & 5 & 6
+\end{vmatrix}$$
+
+After matrix`,
+			out: `<p>Before matrix</p>
+<p><span class="math display">\[\begin{vmatrix}
+\vec{i} & \vec{j} & \vec{k} \\
+1 & 2 & 3 \\
+4 & 5 & 6
+\end{vmatrix}\]</span></p>
+<p>After matrix</p>`,
+		},
+		// pmatrix test
+		{
+			d: "math display - pmatrix multiline",
+			in: `Before matrix
+
+$$\begin{pmatrix}
+1 & 2 \\
+3 & 4
+\end{pmatrix}$$
+
+After matrix`,
+			out: `<p>Before matrix</p>
+<p><span class="math display">\[\begin{pmatrix}
+1 & 2 \\
+3 & 4
+\end{pmatrix}\]</span></p>
+<p>After matrix</p>`,
+		},
 	}
 
 	for i, tc := range tests {
